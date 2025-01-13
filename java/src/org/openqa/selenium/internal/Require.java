@@ -25,8 +25,9 @@ import java.util.Objects;
 
 /**
  * A utility class to check arguments (preconditions) and state.
- * <p>
- * Examples of use:
+ *
+ * <p>Examples of use:
+ *
  * <pre>
  *   public void setActionWithTimeout(Action action delegate, int timeout) {
  *     this.action = Require.nonNull("Action", action);
@@ -41,6 +42,7 @@ public final class Require {
   private static final String MUST_BE_DIR = "%s must be a directory: %s";
   private static final String MUST_BE_FILE = "%s must be a regular file: %s";
   private static final String MUST_BE_EQUAL = "%s must be equal to `%s`";
+  private static final String MUST_BE_EXECUTABLE = "%s must be executable: %s";
   private static final String MUST_BE_NON_NEGATIVE = "%s must be 0 or greater";
   private static final String MUST_BE_POSITIVE = "%s must be greater than 0";
 
@@ -63,8 +65,7 @@ public final class Require {
 
   public static <T> T nonNull(String argName, T arg, String message, Object... args) {
     if (arg == null) {
-      throw new IllegalArgumentException(
-        String.join(" ", argName, String.format(message, args)));
+      throw new IllegalArgumentException(String.join(" ", argName, String.format(message, args)));
     }
     return arg;
   }
@@ -128,22 +129,19 @@ public final class Require {
       throw new IllegalArgumentException(String.format(MUST_BE_SET, argName));
     }
     if (number <= 0) {
-      if (message == null) {
-        throw new IllegalArgumentException(String.format(MUST_BE_POSITIVE, argName));
-      } else {
-        throw new IllegalArgumentException(message);
-      }
+      throw new IllegalArgumentException(
+          Objects.requireNonNullElseGet(message, () -> String.format(MUST_BE_POSITIVE, argName)));
     }
     return number;
   }
 
   public static double positive(String argName, Double number, String message) {
+    if (number == null) {
+      throw new IllegalArgumentException(String.format(MUST_BE_SET, argName));
+    }
     if (number <= 0) {
-      if (message == null) {
-        throw new IllegalArgumentException(String.format(MUST_BE_POSITIVE, argName));
-      } else {
-        throw new IllegalArgumentException(message);
-      }
+      throw new IllegalArgumentException(
+          Objects.requireNonNullElseGet(message, () -> String.format(MUST_BE_POSITIVE, argName)));
     }
     return number;
   }
@@ -160,8 +158,13 @@ public final class Require {
     return new IntChecker(argName, number);
   }
 
+  @Deprecated(forRemoval = true)
   public static FileChecker argument(String argName, File file) {
     return new FileChecker(argName, file);
+  }
+
+  public static PathChecker argument(String argName, Path path) {
+    return new PathChecker(argName, path);
   }
 
   public static void stateCondition(boolean state, String message, Object... args) {
@@ -174,6 +177,7 @@ public final class Require {
     return new StateChecker<>(name, state);
   }
 
+  @Deprecated(forRemoval = true)
   public static FileStateChecker state(String name, File file) {
     return new FileStateChecker(name, file);
   }
@@ -248,6 +252,7 @@ public final class Require {
     }
   }
 
+  @Deprecated(forRemoval = true)
   public static class FileChecker {
 
     private final String argName;
@@ -264,11 +269,11 @@ public final class Require {
       }
       if (!file.exists()) {
         throw new IllegalArgumentException(
-          String.format(MUST_EXIST, argName, file.getAbsolutePath()));
+            String.format(MUST_EXIST, argName, file.getAbsolutePath()));
       }
       if (!file.isFile()) {
         throw new IllegalArgumentException(
-          String.format(MUST_BE_FILE, argName, file.getAbsolutePath()));
+            String.format(MUST_BE_FILE, argName, file.getAbsolutePath()));
       }
       return file;
     }
@@ -279,13 +284,54 @@ public final class Require {
       }
       if (!file.exists()) {
         throw new IllegalArgumentException(
-          String.format(MUST_EXIST, argName, file.getAbsolutePath()));
+            String.format(MUST_EXIST, argName, file.getAbsolutePath()));
       }
       if (!file.isDirectory()) {
         throw new IllegalArgumentException(
-          String.format(MUST_BE_DIR, argName, file.getAbsolutePath()));
+            String.format(MUST_BE_DIR, argName, file.getAbsolutePath()));
       }
       return file;
+    }
+  }
+
+  public static class PathChecker {
+
+    private final String argName;
+    private final Path path;
+
+    PathChecker(String argName, Path path) {
+      this.argName = argName;
+      this.path = path;
+    }
+
+    public Path isFile() {
+      if (path == null) {
+        throw new IllegalArgumentException(String.format(MUST_BE_SET, argName));
+      }
+      if (!Files.exists(path)) {
+        throw new IllegalArgumentException(
+            String.format(MUST_EXIST, argName, path.toAbsolutePath()));
+      }
+      if (!Files.isRegularFile(path)) {
+        throw new IllegalArgumentException(
+            String.format(MUST_BE_FILE, argName, path.toAbsolutePath()));
+      }
+      return path;
+    }
+
+    public Path isDirectory() {
+      if (path == null) {
+        throw new IllegalArgumentException(String.format(MUST_BE_SET, argName));
+      }
+      if (!Files.exists(path)) {
+        throw new IllegalArgumentException(
+            String.format(MUST_EXIST, argName, path.toAbsolutePath()));
+      }
+      if (!Files.isDirectory(path)) {
+        throw new IllegalArgumentException(
+            String.format(MUST_BE_DIR, argName, path.toAbsolutePath()));
+      }
+      return path;
     }
   }
 
@@ -324,6 +370,7 @@ public final class Require {
     }
   }
 
+  @Deprecated(forRemoval = true)
   public static class FileStateChecker {
 
     private final String name;
@@ -359,6 +406,20 @@ public final class Require {
       }
       return file;
     }
+
+    public File isExecutable() {
+      if (file == null) {
+        throw new IllegalStateException(String.format(MUST_BE_SET, name));
+      }
+      if (!file.exists()) {
+        throw new IllegalStateException(String.format(MUST_EXIST, name, file.getAbsolutePath()));
+      }
+      if (!file.canExecute()) {
+        throw new IllegalStateException(
+            String.format(MUST_BE_EXECUTABLE, name, file.getAbsolutePath()));
+      }
+      return file;
+    }
   }
 
   public static class PathStateChecker {
@@ -375,7 +436,9 @@ public final class Require {
       if (path == null) {
         throw new IllegalStateException(String.format(MUST_BE_SET, name));
       }
-      if (!Files.exists(path)) {
+      // notExists returns false in case it is impossible to determinate the exact result of a link
+      // target e.g. Windows app execution aliases
+      if (Files.notExists(path)) {
         throw new IllegalStateException(String.format(MUST_EXIST, name, path));
       }
       if (!Files.isRegularFile(path)) {
@@ -388,11 +451,30 @@ public final class Require {
       if (path == null) {
         throw new IllegalStateException(String.format(MUST_BE_SET, name));
       }
-      if (!Files.exists(path)) {
+      // notExists returns false in case it is impossible to determinate the exact result of a link
+      // target e.g. Windows app execution aliases
+      if (Files.notExists(path)) {
         throw new IllegalStateException(String.format(MUST_EXIST, name, path));
       }
       if (!Files.isDirectory(path)) {
         throw new IllegalStateException(String.format(MUST_BE_DIR, name, path));
+      }
+      return path;
+    }
+
+    public Path isExecutable() {
+      if (path == null) {
+        throw new IllegalStateException(String.format(MUST_BE_SET, name));
+      }
+      // notExists returns false in case it is impossible to determinate the exact result of a link
+      // target e.g. Windows app execution aliases
+      if (Files.notExists(path)) {
+        throw new IllegalStateException(String.format(MUST_EXIST, name, path));
+      }
+      // do not check for isRegularFile here, there are executable none regular files e.g. Windows
+      // app execution aliases
+      if (!Files.isExecutable(path)) {
+        throw new IllegalStateException(String.format(MUST_BE_EXECUTABLE, name, path));
       }
       return path;
     }

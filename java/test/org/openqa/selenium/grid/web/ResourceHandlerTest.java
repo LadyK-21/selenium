@@ -17,6 +17,15 @@
 
 package org.openqa.selenium.grid.web;
 
+import static java.net.HttpURLConnection.HTTP_MOVED_TEMP;
+import static java.net.HttpURLConnection.HTTP_OK;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.openqa.selenium.remote.http.HttpMethod.GET;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -26,21 +35,9 @@ import org.openqa.selenium.remote.http.HttpRequest;
 import org.openqa.selenium.remote.http.HttpResponse;
 import org.openqa.selenium.remote.http.Route;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
-import static java.net.HttpURLConnection.HTTP_MOVED_TEMP;
-import static java.net.HttpURLConnection.HTTP_OK;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.openqa.selenium.remote.http.HttpMethod.GET;
-
 class ResourceHandlerTest {
 
-  @TempDir
-  File folder;
+  @TempDir File folder;
   private Path base;
 
   @BeforeEach
@@ -50,7 +47,7 @@ class ResourceHandlerTest {
 
   @Test
   void shouldLoadContent() throws IOException {
-    Files.write(base.resolve("content.txt"), "I like cheese".getBytes(UTF_8));
+    Files.writeString(base.resolve("content.txt"), "I like cheese");
 
     HttpHandler handler = new ResourceHandler(new PathResource(base));
     HttpResponse res = handler.execute(new HttpRequest(GET, "/content.txt"));
@@ -92,9 +89,10 @@ class ResourceHandlerTest {
     Path contents = base.resolve("cheese").resolve("cake.txt");
 
     Files.createDirectories(contents.getParent());
-    Files.write(contents, "delicious".getBytes(UTF_8));
+    Files.writeString(contents, "delicious");
 
-    HttpHandler handler = Route.prefix("/peas").to(Route.combine(new ResourceHandler(new PathResource(base))));
+    HttpHandler handler =
+        Route.prefix("/peas").to(Route.combine(new ResourceHandler(new PathResource(base))));
 
     // Check redirect works as expected
     HttpResponse res = handler.execute(new HttpRequest(GET, "/peas/cheese"));
@@ -110,7 +108,7 @@ class ResourceHandlerTest {
   @Test
   void shouldRedirectToIndexPageIfOneExists() throws IOException {
     Path index = base.resolve("index.html");
-    Files.write(index, "Cheese".getBytes(UTF_8));
+    Files.writeString(index, "Cheese");
 
     ResourceHandler handler = new ResourceHandler(new PathResource(base));
     HttpResponse res = handler.execute(new HttpRequest(GET, "/"));

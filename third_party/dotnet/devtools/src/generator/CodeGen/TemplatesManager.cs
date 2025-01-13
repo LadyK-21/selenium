@@ -20,10 +20,7 @@ namespace OpenQA.Selenium.DevToolsGenerator.CodeGen
         /// <summary>
         /// Gets the code generation settings associated with the protocol generator
         /// </summary>
-        public CodeGenerationSettings Settings
-        {
-            get { return m_settings; }
-        }
+        public CodeGenerationSettings Settings => m_settings;
 
         public TemplatesManager(CodeGenerationSettings settings)
         {
@@ -31,22 +28,28 @@ namespace OpenQA.Selenium.DevToolsGenerator.CodeGen
         }
 
         /// <summary>
-        /// Returns a generator singleton for the specified template path.
+        /// Returns a generator singleton for the specified template settings.
         /// </summary>
-        /// <param name="templatePath"></param>
+        /// <param name="templateSettings">The settings for a generator.</param>
         /// <returns></returns>
         public Func<object, string> GetGeneratorForTemplate(CodeGenerationTemplateSettings templateSettings)
         {
             var templatePath = templateSettings.TemplatePath;
             if (m_templateGenerators.ContainsKey(templatePath))
+            {
                 return m_templateGenerators[templatePath];
+            }
 
             var targetTemplate = templatePath;
             if (!Path.IsPathRooted(targetTemplate))
+            {
                 targetTemplate = Path.Combine(Settings.TemplatesPath, targetTemplate);
+            }
 
             if (!File.Exists(targetTemplate))
+            {
                 throw new FileNotFoundException($"Unable to locate a template at {targetTemplate} - please ensure that a template file exists at this location.");
+            }
 
             var templateContents = File.ReadAllText(targetTemplate);
 
@@ -81,7 +84,7 @@ namespace OpenQA.Selenium.DevToolsGenerator.CodeGen
 
                 var str = arguments[0] == null ? "" : arguments[0].ToString();
 
-                if (String.IsNullOrWhiteSpace(str))
+                if (string.IsNullOrWhiteSpace(str))
                 {
                     switch (context)
                     {
@@ -100,7 +103,7 @@ namespace OpenQA.Selenium.DevToolsGenerator.CodeGen
                 {
                     int.TryParse(frontPaddingObj.ToString(), out frontPadding);
                 }
-                    
+
                 str = Utility.ReplaceLineEndings(str, Environment.NewLine + new StringBuilder(4 * frontPadding).Insert(0, "    ", frontPadding) + "/// ");
 
                 writer.WriteSafeString(str);
@@ -121,7 +124,9 @@ namespace OpenQA.Selenium.DevToolsGenerator.CodeGen
 
                 var codeGenContext = arguments[0] as CodeGeneratorContext;
                 if (codeGenContext == null)
+                {
                     throw new InvalidOperationException("Expected context argument to be non-null.");
+                }
 
                 var mappedType = Utility.GetTypeMappingForType(typeDefinition, codeGenContext.Domain, codeGenContext.KnownTypes);
                 writer.WriteSafeString(mappedType);
