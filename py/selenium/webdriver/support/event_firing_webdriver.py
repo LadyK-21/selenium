@@ -14,7 +14,10 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import typing
+
+from typing import Any
+from typing import List
+from typing import Tuple
 
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.common.by import By
@@ -36,13 +39,11 @@ def _wrap_elements(result, ef_driver):
 
 
 class EventFiringWebDriver:
-    """
-    A wrapper around an arbitrary WebDriver instance which supports firing events
-    """
+    """A wrapper around an arbitrary WebDriver instance which supports firing
+    events."""
 
     def __init__(self, driver: WebDriver, event_listener: AbstractEventListener) -> None:
-        """
-        Creates a new instance of the EventFiringWebDriver
+        """Creates a new instance of the EventFiringWebDriver.
 
         :Args:
          - driver : A WebDriver instance
@@ -75,7 +76,8 @@ class EventFiringWebDriver:
 
     @property
     def wrapped_driver(self) -> WebDriver:
-        """Returns the WebDriver instance wrapped by this EventsFiringWebDriver"""
+        """Returns the WebDriver instance wrapped by this
+        EventsFiringWebDriver."""
         return self._driver
 
     def get(self, url: str) -> None:
@@ -104,12 +106,10 @@ class EventFiringWebDriver:
     def find_element(self, by=By.ID, value=None) -> WebElement:
         return self._dispatch("find", (by, value, self._driver), "find_element", (by, value))
 
-    def find_elements(self, by=By.ID, value=None) -> typing.List[WebElement]:
+    def find_elements(self, by=By.ID, value=None) -> List[WebElement]:
         return self._dispatch("find", (by, value, self._driver), "find_elements", (by, value))
 
-    def _dispatch(
-        self, l_call: str, l_args: typing.Tuple[typing.Any, ...], d_call: str, d_args: typing.Tuple[typing.Any, ...]
-    ):
+    def _dispatch(self, l_call: str, l_args: Tuple[Any, ...], d_call: str, d_args: Tuple[Any, ...]):
         getattr(self._listener, f"before_{l_call}")(*l_args)
         try:
             result = getattr(self._driver, d_call)(*d_args)
@@ -161,14 +161,10 @@ class EventFiringWebDriver:
 
 
 class EventFiringWebElement:
-    """ "
-    A wrapper around WebElement instance which supports firing events
-    """
+    """A wrapper around WebElement instance which supports firing events."""
 
     def __init__(self, webelement: WebElement, ef_driver: EventFiringWebDriver) -> None:
-        """
-        Creates a new instance of the EventFiringWebElement
-        """
+        """Creates a new instance of the EventFiringWebElement."""
         self._webelement = webelement
         self._ef_driver = ef_driver
         self._driver = ef_driver.wrapped_driver
@@ -176,7 +172,8 @@ class EventFiringWebElement:
 
     @property
     def wrapped_element(self) -> WebElement:
-        """Returns the WebElement wrapped by this EventFiringWebElement instance"""
+        """Returns the WebElement wrapped by this EventFiringWebElement
+        instance."""
         return self._webelement
 
     def click(self) -> None:
@@ -191,7 +188,7 @@ class EventFiringWebElement:
     def find_element(self, by=By.ID, value=None) -> WebElement:
         return self._dispatch("find", (by, value, self._driver), "find_element", (by, value))
 
-    def find_elements(self, by=By.ID, value=None) -> typing.List[WebElement]:
+    def find_elements(self, by=By.ID, value=None) -> List[WebElement]:
         return self._dispatch("find", (by, value, self._driver), "find_elements", (by, value))
 
     def _dispatch(self, l_call, l_args, d_call, d_args):

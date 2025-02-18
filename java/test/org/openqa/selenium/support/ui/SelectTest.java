@@ -26,16 +26,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import org.junit.jupiter.api.Test;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebElement;
-
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
 
 @Tag("UnitTests")
 class SelectTest {
@@ -156,6 +155,25 @@ class SelectTest {
   }
 
   @Test
+  void shouldAllowOptionsToBeSelectedByContainsVisibleText() {
+    String parameterText = "foo";
+
+    final WebElement firstOption = mockOption("first", false);
+
+    final WebElement element = mockSelectWebElement("multiple");
+    when(element.findElements(
+            By.xpath(".//option[contains(., " + Quotes.escape(parameterText) + ")]")))
+        .thenReturn(Collections.singletonList(firstOption));
+    when(firstOption.getText()).thenReturn("foo bar");
+    when(firstOption.isEnabled()).thenReturn(true);
+
+    Select select = new Select(element);
+    select.selectByContainsVisibleText(parameterText);
+
+    verify(firstOption).click();
+  }
+
+  @Test
   void shouldNotAllowDisabledOptionsToBeSelected() {
     final WebElement firstOption = mockOption("first", false);
     when(firstOption.isEnabled()).thenReturn(false);
@@ -166,8 +184,8 @@ class SelectTest {
 
     Select select = new Select(element);
     assertThatThrownBy(() -> select.selectByVisibleText("fish"))
-      .isInstanceOf(UnsupportedOperationException.class)
-      .hasMessage("You may not select a disabled option");
+        .isInstanceOf(UnsupportedOperationException.class)
+        .hasMessage("You may not select a disabled option");
 
     verify(firstOption, never()).click();
   }
@@ -189,8 +207,8 @@ class SelectTest {
     final WebElement firstOption = mockOption("first", false);
 
     final WebElement element = mockSelectWebElement("multiple");
-    when(element.findElements(By.xpath(".//option[@value = \"b\"]"))).thenReturn(
-        Collections.singletonList(firstOption));
+    when(element.findElements(By.xpath(".//option[@value = \"b\"]")))
+        .thenReturn(Collections.singletonList(firstOption));
 
     Select select = new Select(element);
     select.selectByValue("b");
@@ -213,8 +231,7 @@ class SelectTest {
   @Test
   void shouldNotAllowUserToDeselectAllWhenSelectDoesNotSupportMultipleSelections() {
     Select select = selectElementWithMultipleEqualTo(null);
-    assertThatExceptionOfType(UnsupportedOperationException.class)
-        .isThrownBy(select::deselectAll);
+    assertThatExceptionOfType(UnsupportedOperationException.class).isThrownBy(select::deselectAll);
   }
 
   @Test
@@ -228,6 +245,24 @@ class SelectTest {
 
     Select select = new Select(element);
     select.deselectByVisibleText("b");
+
+    verify(firstOption).click();
+    verify(secondOption, never()).click();
+  }
+
+  @Test
+  void shouldAllowOptionsToDeSelectedByContainsVisibleText() {
+    String parameterText = "b";
+    final WebElement firstOption = mockOption("first", true);
+    final WebElement secondOption = mockOption("second", false);
+
+    final WebElement element = mockSelectWebElement("multiple");
+    when(element.findElements(
+            By.xpath(".//option[contains(., " + Quotes.escape(parameterText) + ")]")))
+        .thenReturn(Arrays.asList(firstOption, secondOption));
+
+    Select select = new Select(element);
+    select.deSelectByContainsVisibleText(parameterText);
 
     verify(firstOption).click();
     verify(secondOption, never()).click();
@@ -304,5 +339,8 @@ class SelectTest {
 
     assertThatExceptionOfType(NoSuchElementException.class)
         .isThrownBy(() -> select.selectByVisibleText("also not there"));
+
+    assertThatExceptionOfType(NoSuchElementException.class)
+        .isThrownBy(() -> select.selectByContainsVisibleText("also not there"));
   }
 }

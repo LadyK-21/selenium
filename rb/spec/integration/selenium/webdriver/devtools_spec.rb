@@ -21,33 +21,40 @@ require_relative 'spec_helper'
 
 module Selenium
   module WebDriver
-    describe DevTools, exclusive: {browser: %i[chrome edge firefox firefox_nightly]} do
-      after { reset_driver! }
+    describe DevTools, exclusive: [{bidi: false, reason: 'Not yet implemented with BiDi'},
+                                   {browser: %i[chrome edge]}] do
+      after { |example| reset_driver!(example: example) }
 
       it 'sends commands' do
         driver.devtools.page.navigate(url: url_for('xhtmlTest.html'))
-        expect(driver.title).to eq("XHTML Test Page")
+        expect(driver.title).to eq('XHTML Test Page')
+      end
+
+      it 'maps methods to classes' do
+        expect(driver.devtools.css).not_to be_nil
+        expect(driver.devtools.dom).not_to be_nil
+        expect(driver.devtools.dom_debugger).not_to be_nil
       end
 
       it 'supports events' do
-        callback = instance_double(Proc, call: nil)
-
-        driver.devtools.page.enable
-        driver.devtools.page.on(:load_event_fired) { callback.call }
-        driver.navigate.to url_for('xhtmlTest.html')
-        sleep 0.5
-
-        expect(callback).to have_received(:call).at_least(:once)
+        expect { |block|
+          driver.devtools.page.enable
+          driver.devtools.page.on(:load_event_fired, &block)
+          driver.navigate.to url_for('xhtmlTest.html')
+          sleep 0.5
+        }.to yield_control
       end
 
       it 'propagates errors in events' do
-        driver.devtools.page.enable
-        driver.devtools.page.on(:load_event_fired) { raise "This is fine!" }
-        expect { driver.navigate.to url_for('xhtmlTest.html') }.to raise_error(RuntimeError, "This is fine!")
+        expect {
+          driver.devtools.page.enable
+          driver.devtools.page.on(:load_event_fired) { raise 'This is fine!' }
+          driver.navigate.to url_for('xhtmlTest.html')
+          sleep 0.5
+        }.to raise_error(RuntimeError, 'This is fine!')
       end
 
-      context 'authentication', except: {browser: %i[firefox firefox_nightly],
-                                         reason: 'Fetch.enable is not yet supported'} do
+      describe '#register' do
         let(:username) { SpecSupport::RackServer::TestApp::BASIC_AUTH_CREDENTIALS.first }
         let(:password) { SpecSupport::RackServer::TestApp::BASIC_AUTH_CREDENTIALS.last }
 
@@ -77,13 +84,13 @@ module Selenium
 
         driver.execute_script("console.log('I like cheese');")
         sleep 0.5
-        driver.execute_script("console.log(true);")
+        driver.execute_script('console.log(true);')
         sleep 0.5
-        driver.execute_script("console.log(null);")
+        driver.execute_script('console.log(null);')
         sleep 0.5
-        driver.execute_script("console.log(undefined);")
+        driver.execute_script('console.log(undefined);')
         sleep 0.5
-        driver.execute_script("console.log(document);")
+        driver.execute_script('console.log(document);')
         sleep 0.5
 
         expect(logs).to include(
@@ -94,31 +101,16 @@ module Selenium
         )
       end
 
-      it 'notifies about document log messages', except: {browser: %i[firefox firefox_nightly],
-                                                          reason: 'Firefox & Chrome parse document differently'} do
+      it 'notifies about document log messages' do
         logs = []
         driver.on_log_event(:console) { |log| logs.push(log) }
         driver.navigate.to url_for('javascriptPage.html')
 
-        driver.execute_script("console.log(document);")
+        driver.execute_script('console.log(document);')
         wait.until { !logs.empty? }
 
         expect(logs).to include(
           an_object_having_attributes(type: :log, args: [hash_including('type' => 'object')])
-        )
-      end
-
-      it 'notifies about document log messages', only: {browser: %i[firefox firefox_nightly],
-                                                        reason: 'Firefox & Chrome parse document differently'} do
-        logs = []
-        driver.on_log_event(:console) { |log| logs.push(log) }
-        driver.navigate.to url_for('javascriptPage.html')
-
-        driver.execute_script("console.log(document);")
-        wait.until { !logs.empty? }
-
-        expect(logs).to include(
-          an_object_having_attributes(type: :log, args: [hash_including('location')])
         )
       end
 
@@ -135,8 +127,7 @@ module Selenium
         expect(exception.stacktrace).not_to be_empty
       end
 
-      it 'notifies about DOM mutations', except: {browser: %i[firefox firefox_nightly],
-                                                  reason: 'Runtime.addBinding not yet supported'} do
+      it 'notifies about DOM mutations' do
         mutations = []
         driver.on_log_event(:mutation) { |mutation| mutations.push(mutation) }
         driver.navigate.to url_for('dynamic.html')
@@ -151,8 +142,7 @@ module Selenium
         expect(mutation.old_value).to eq('display:none;')
       end
 
-      context 'network interception', except: {browser: %i[firefox firefox_nightly],
-                                               reason: 'Fetch.enable is not yet supported'} do
+      describe '#intercept' do
         it 'continues requests' do
           requests = []
           driver.intercept do |request, &continue|
@@ -171,6 +161,7 @@ module Selenium
               uri.path = '/devtools_request_interception_test/two.js'
               request.url = uri.to_s
             end
+            request.post_data = {foo: 'bar'}.to_json
             continue.call(request)
           end
           driver.navigate.to url_for('devToolsRequestInterceptionTest.html')
@@ -197,11 +188,11 @@ module Selenium
             end
           end
           driver.navigate.to url_for('html5Page.html')
-          expect(driver.find_elements(id: "appended")).not_to be_empty
+          expect(driver.find_elements(id: 'appended')).not_to be_empty
         end
       end
 
-      context 'script pinning', except: {browser: %i[firefox firefox_nightly]} do
+      describe '#pin_script', except: {browser: :firefox} do
         before do
           driver.navigate.to url_for('xhtmlTest.html')
         end

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-import React, { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
@@ -37,8 +37,8 @@ import {
   DialogTitle,
   IconButton
 } from '@mui/material'
-import InfoIcon from '@mui/icons-material/Info'
-import VideocamIcon from '@mui/icons-material/Videocam'
+import { Info as InfoIcon } from '@mui/icons-material'
+import {Videocam as VideocamIcon } from '@mui/icons-material'
 import Slide from '@mui/material/Slide'
 import { TransitionProps } from '@mui/material/transitions'
 import browserVersion from '../../util/browser-version'
@@ -46,11 +46,16 @@ import EnhancedTableToolbar from '../EnhancedTableToolbar'
 import prettyMilliseconds from 'pretty-ms'
 import BrowserLogo from '../common/BrowserLogo'
 import OsLogo from '../common/OsLogo'
+import RunningSessionsSearchBar from './RunningSessionsSearchBar'
 import { Size } from '../../models/size'
 import LiveView from '../LiveView/LiveView'
 import SessionData, { createSessionData } from '../../models/session-data'
+import { useNavigate } from 'react-router-dom'
 
 function descendingComparator<T> (a: T, b: T, orderBy: keyof T): number {
+  if (orderBy === 'sessionDurationMillis') {
+    return Number(b[orderBy]) - Number(a[orderBy])
+  }
   if (b[orderBy] < a[orderBy]) {
     return -1
   }
@@ -93,7 +98,7 @@ const headCells: HeadCell[] = [
   { id: 'id', numeric: false, label: 'Session' },
   { id: 'capabilities', numeric: false, label: 'Capabilities' },
   { id: 'startTime', numeric: false, label: 'Start time' },
-  { id: 'sessionDurationMillis', numeric: false, label: 'Duration' },
+  { id: 'sessionDurationMillis', numeric: true, label: 'Duration' },
   { id: 'nodeUri', numeric: false, label: 'Node URI' }
 ]
 
@@ -169,11 +174,22 @@ function RunningSessions (props) {
   const [rowOpen, setRowOpen] = useState('')
   const [rowLiveViewOpen, setRowLiveViewOpen] = useState('')
   const [order, setOrder] = useState<Order>('asc')
-  const [orderBy, setOrderBy] = useState<keyof SessionData>('startTime')
+  const [orderBy, setOrderBy] = useState<keyof SessionData>('sessionDurationMillis')
   const [selected, setSelected] = useState<string[]>([])
   const [page, setPage] = useState(0)
   const [dense, setDense] = useState(false)
-  const [rowsPerPage, setRowsPerPage] = useState(5)
+  const [rowsPerPage, setRowsPerPage] = useState(10)
+  const [searchFilter, setSearchFilter] = useState('')
+  const [searchBarHelpOpen, setSearchBarHelpOpen] = useState(false)
+  const liveViewRef = useRef(null)
+  const navigate = useNavigate()
+
+  const handleDialogClose = () => {
+    if (liveViewRef.current) {
+      liveViewRef.current.disconnect()
+    }
+    navigate('/sessions')
+  }
 
   const handleRequestSort = (event: React.MouseEvent<unknown>,
     property: keyof SessionData) => {
@@ -233,7 +249,7 @@ function RunningSessions (props) {
 
   const displayLiveView = (id: string): JSX.Element => {
     const handleLiveViewIconClick = (): void => {
-      setRowLiveViewOpen(id)
+      navigate(`/session/${id}`)
     }
     return (
       <IconButton
@@ -246,7 +262,7 @@ function RunningSessions (props) {
     )
   }
 
-  const { sessions, origin } = props
+  const { sessions, origin, sessionId } = props
 
   const rows = sessions.map((session) => {
     return createSessionData(
@@ -263,12 +279,32 @@ function RunningSessions (props) {
   })
   const emptyRows = rowsPerPage - Math.min(rowsPerPage, rows.length - page * rowsPerPage)
 
+  useEffect(() => {
+    let s = sessionId || ''
+
+    let session_ids = sessions.map((session) => session.id)
+
+    if (!session_ids.includes(s)) {
+      setRowLiveViewOpen('')
+      navigate('/sessions')
+    } else {
+      setRowLiveViewOpen(s)
+    }
+  }, [sessionId, sessions])
+
   return (
     <Box width='100%'>
       {rows.length > 0 && (
         <div>
           <Paper sx={{ width: '100%', marginBottom: 2 }}>
-            <EnhancedTableToolbar title='Running' />
+            <EnhancedTableToolbar title='Running'>
+              <RunningSessionsSearchBar
+                searchFilter={searchFilter}
+                handleSearch={setSearchFilter}
+                searchBarHelpOpen={searchBarHelpOpen}
+                setSearchBarHelpOpen={setSearchBarHelpOpen}
+              />
+            </EnhancedTableToolbar>
             <TableContainer>
               <Table
                 sx={{ minWidth: '750px' }}
@@ -283,6 +319,26 @@ function RunningSessions (props) {
                 />
                 <TableBody>
                   {stableSort(rows, getComparator(order, orderBy))
+                    .filter((session) => {
+                      if (searchFilter === '') {
+                        // don't filter anything on empty search field
+                        return true
+                      }
+
+                      if (!searchFilter.includes('=')) {
+                        // filter on the entire session if users don't use `=` symbol
+                        return JSON.stringify(session)
+                          .toLowerCase()
+                          .includes(searchFilter.toLowerCase())
+                      }
+
+                      const [filterField, filterItem] = searchFilter.split('=')
+                      if (filterField.startsWith('capabilities,')) {
+                        const capabilityID = filterField.split(',')[1]
+                        return (JSON.parse(session.capabilities as string) as object)[capabilityID] === filterItem
+                      }
+                      return session[filterField] === filterItem
+                    })
                     .slice(page * rowsPerPage,
                       page * rowsPerPage + rowsPerPage)
                     .map((row, index) => {
@@ -313,7 +369,7 @@ function RunningSessions (props) {
                             {
                                 (row.vnc as string).length > 0 &&
                                   <Dialog
-                                    onClose={() => setRowLiveViewOpen('')}
+                                    onClose={() => navigate("/sessions")}
                                     aria-labelledby='live-view-dialog'
                                     open={rowLiveViewOpen === row.id}
                                     fullWidth
@@ -349,14 +405,15 @@ function RunningSessions (props) {
                                       sx={{ height: '600px' }}
                                     >
                                       <LiveView
+                                        ref={liveViewRef}
                                         url={row.vnc as string}
                                         scaleViewport
-                                        onClose={() => setRowLiveViewOpen('')}
+                                        onClose={() => navigate("/sessions")}
                                       />
                                     </DialogContent>
                                     <DialogActions>
                                       <Button
-                                        onClick={() => setRowLiveViewOpen('')}
+                                        onClick={handleDialogClose}
                                         color='primary'
                                         variant='contained'
                                       >

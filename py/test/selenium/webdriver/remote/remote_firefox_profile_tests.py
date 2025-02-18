@@ -18,19 +18,13 @@
 import pytest
 
 from selenium import webdriver
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-
-
-@pytest.fixture
-def capabilities():
-    capabilities = DesiredCapabilities.FIREFOX.copy()
-    capabilities["marionette"] = False
-    return capabilities
 
 
 @pytest.fixture
 def driver(options):
-    driver = webdriver.Remote(options=options)
+    with pytest.warns(None) as record:
+        driver = webdriver.Remote(options=options)
+    assert len(record) == 0
     yield driver
     driver.quit()
 

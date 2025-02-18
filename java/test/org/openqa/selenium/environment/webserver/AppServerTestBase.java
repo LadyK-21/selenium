@@ -17,15 +17,20 @@
 
 package org.openqa.selenium.environment.webserver;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.openqa.selenium.remote.http.Contents.string;
 
-import org.junit.jupiter.api.AfterEach;
+import java.io.File;
+import java.io.IOException;
+import java.net.URL;
+import java.nio.file.Files;
+import java.time.Duration;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
@@ -35,13 +40,6 @@ import org.openqa.selenium.remote.http.HttpRequest;
 import org.openqa.selenium.remote.http.HttpResponse;
 import org.openqa.selenium.support.ui.WebDriverWait;
 import org.openqa.selenium.testing.drivers.WebDriverBuilder;
-
-import java.io.File;
-import java.io.IOException;
-import java.net.URL;
-import java.nio.file.Files;
-import java.time.Duration;
-import java.util.stream.StreamSupport;
 
 public abstract class AppServerTestBase {
   private static final String APPCACHE_MIME_TYPE = "text/cache-manifest";
@@ -126,8 +124,9 @@ public abstract class AppServerTestBase {
 
     System.out.printf("Content for %s was %s%n", url, string(response));
 
-    assertTrue(StreamSupport.stream(response.getHeaders("Content-Type").spliterator(), false)
-        .anyMatch(header -> header.contains(APPCACHE_MIME_TYPE)));
+    assertTrue(
+        StreamSupport.stream(response.getHeaders("Content-Type").spliterator(), false)
+            .anyMatch(header -> header.contains(APPCACHE_MIME_TYPE)));
   }
 
   @Test
@@ -135,15 +134,14 @@ public abstract class AppServerTestBase {
     String FILE_CONTENTS = "Uploaded file";
     File testFile = File.createTempFile("webdriver", "tmp");
     testFile.deleteOnExit();
-    Files.write(testFile.toPath(), FILE_CONTENTS.getBytes(UTF_8));
+    Files.writeString(testFile.toPath(), FILE_CONTENTS);
 
     driver.get(server.whereIs("upload.html"));
     driver.findElement(By.id("upload")).sendKeys(testFile.getAbsolutePath());
     driver.findElement(By.id("go")).submit();
 
     driver.switchTo().frame("upload_target");
-    new WebDriverWait(driver, Duration.ofSeconds(10)).until(
-        d -> d.findElement(By.xpath("//body")).getText().equals(FILE_CONTENTS));
+    new WebDriverWait(driver, Duration.ofSeconds(10))
+        .until(d -> d.findElement(By.xpath("//body")).getText().equals(FILE_CONTENTS));
   }
-
 }
